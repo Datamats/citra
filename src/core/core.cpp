@@ -12,6 +12,8 @@
 #include "core/arm/dynarmic/arm_dynarmic.h"
 #endif
 #include "core/arm/dyncom/arm_dyncom.h"
+#include "core/arm/armos/armos.h"
+#include "core/cheats/cheats.h"
 #include "core/core.h"
 #include "core/core_timing.h"
 #include "core/gdbstub/gdbstub.h"
@@ -164,6 +166,8 @@ void System::Reschedule() {
 }
 
 System::ResultStatus System::Init(EmuWindow& emu_window, u32 system_mode) {
+    Armos::Init();
+
     LOG_DEBUG(HW_Memory, "initialized OK");
 
     CoreTiming::Init();
