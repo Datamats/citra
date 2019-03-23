@@ -10,6 +10,7 @@
 #include "common/logging/log.h"
 #include "common/swap.h"
 #include "core/arm/arm_interface.h"
+#include "core/arm/armos/armos.h"
 #include "core/core.h"
 #include "core/hle/kernel/memory.h"
 #include "core/hle/kernel/process.h"
@@ -31,6 +32,35 @@ void SetCurrentPageTable(PageTable* page_table) {
     if (Core::System::GetInstance().IsPoweredOn()) {
         Core::CPU().PageTableChanged();
     }
+
+    std::array<bool, VRAM_SIZE / PAGE_SIZE> vram{};
+    std::array<bool, LINEAR_HEAP_SIZE / PAGE_SIZE> linear_heap{};
+    std::array<bool, NEW_LINEAR_HEAP_SIZE / PAGE_SIZE> new_linear_heap{};
+};
+
+class MemorySystem::Impl {
+public:
+    // Visual Studio would try to allocate these on compile time if they are std::array, which would
+    // exceed the memory limit.
+    // std::unique_ptr<u8[]> fcram = std::make_unique<u8[]>(Memory::FCRAM_N3DS_SIZE);
+    // std::unique_ptr<u8[]> vram = std::make_unique<u8[]>(Memory::VRAM_SIZE);
+    // std::unique_ptr<u8[]> n3ds_extra_ram = std::make_unique<u8[]>(Memory::N3DS_EXTRA_RAM_SIZE);
+    Armos::Region fcram = Armos::AllocateRegion(Memory::FCRAM_N3DS_SIZE);
+    Armos::Region vram = Armos::AllocateRegion(Memory::VRAM_SIZE);
+    Armos::Region n3ds_extra_ram = Armos::AllocateRegion(Memory::N3DS_EXTRA_RAM_SIZE);
+
+    PageTable* current_page_table = nullptr;
+    RasterizerCacheMarker cache_marker;
+    std::vector<PageTable*> page_table_list;
+
+    ARM_Interface* cpu = nullptr;
+};
+
+MemorySystem::MemorySystem() : impl(std::make_unique<Impl>()) {}
+MemorySystem::~MemorySystem() = default;
+
+void MemorySystem::SetCPU(ARM_Interface& cpu) {
+    impl->cpu = &cpu;
 }
 
 PageTable* GetCurrentPageTable() {
@@ -43,6 +73,12 @@ static void MapPages(PageTable& page_table, u32 base, u32 size, u8* memory, Page
 
     RasterizerFlushVirtualRegion(base << PAGE_BITS, size * PAGE_SIZE,
                                  FlushMode::FlushAndInvalidate);
+
+    if (memory) {
+        Armos::Guest::MapMemory(page_table.armos_guest, memory, base * PAGE_SIZE, size * PAGE_SIZE);
+    } else {
+        Armos::Guest::UnmapMemory(page_table.armos_guest, base * PAGE_SIZE, size * PAGE_SIZE);
+    }
 
     u32 end = base + size;
     while (base != end) {

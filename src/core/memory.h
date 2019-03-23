@@ -12,6 +12,12 @@
 #include "common/common_types.h"
 #include "core/mmio.h"
 
+class ARM_Interface;
+
+namespace Armos {
+    class GuestContext;
+}
+
 namespace Kernel {
 class Process;
 }
@@ -52,6 +58,8 @@ struct SpecialRegion {
  * requires an indexed fetch and a check for NULL.
  */
 struct PageTable {
+    Armos::GuestContext* armos_guest;
+
     /**
      * Array of memory pointers backing each page. An entry can only be non-null if the
      * corresponding entry in the `attributes` array is of type `Memory`.
