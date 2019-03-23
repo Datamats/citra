@@ -4,6 +4,8 @@
 
 #include <chrono>
 #include <cstring>
+#include "core/arm/armos/armos.h"
+#include "core/core.h"
 #include "core/core_timing.h"
 #include "core/hle/service/ptm/ptm.h"
 #include "core/hle/shared_page.h"
@@ -29,19 +31,20 @@ static std::chrono::seconds GetInitTime() {
     }
 }
 
-Handler::Handler() {
-    std::memset(&shared_page, 0, sizeof(shared_page));
+Handler::Handler(Core::Timing& timing) : timing(timing) {
+    shared_page = reinterpret_cast<SharedPageDef*>(Armos::AllocateRegion(sizeof(SharedPageDef)).get());
+    std::memset(shared_page, 0, sizeof(SharedPageDef));
 
-    shared_page.running_hw = 0x1; // product
+    shared_page->running_hw = 0x1; // product
 
     // Some games wait until this value becomes 0x1, before asking running_hw
-    shared_page.unknown_value = 0x1;
+    shared_page->unknown_value = 0x1;
 
     // Set to a completely full battery
-    shared_page.battery_state.charge_level.Assign(
+    shared_page->battery_state.charge_level.Assign(
         static_cast<u8>(Service::PTM::ChargeLevels::CompletelyFull));
-    shared_page.battery_state.is_adapter_connected.Assign(1);
-    shared_page.battery_state.is_charging.Assign(1);
+    shared_page->battery_state.is_adapter_connected.Assign(1);
+    shared_page->battery_state.is_charging.Assign(1);
 
     init_time = GetInitTime();
 
@@ -52,7 +55,7 @@ Handler::Handler() {
 
     float slidestate =
         Settings::values.toggle_3d ? (float_le)Settings::values.factor_3d / 100 : 0.0f;
-    shared_page.sliderstate_3d = slidestate;
+    shared_page->sliderstate_3d = slidestate;
 }
 
 /// Gets system time in 3DS format. The epoch is Jan 1900, and the unit is millisecond.
@@ -87,33 +90,37 @@ u64 Handler::GetSystemTime() const {
 
 void Handler::UpdateTimeCallback(u64 userdata, int cycles_late) {
     DateTime& date_time =
-        shared_page.date_time_counter % 2 ? shared_page.date_time_0 : shared_page.date_time_1;
+        shared_page->date_time_counter % 2 ? shared_page->date_time_0 : shared_page->date_time_1;
 
     date_time.date_time = GetSystemTime();
     date_time.update_tick = CoreTiming::GetTicks();
     date_time.tick_to_second_coefficient = BASE_CLOCK_RATE_ARM11;
     date_time.tick_offset = 0;
 
-    ++shared_page.date_time_counter;
+    ++shared_page->date_time_counter;
 
     // system time is updated hourly
     CoreTiming::ScheduleEvent(msToCycles(60 * 60 * 1000) - cycles_late, update_time_event);
 }
 
 void Handler::SetMacAddress(const MacAddress& addr) {
-    std::memcpy(shared_page.wifi_macaddr, addr.data(), sizeof(MacAddress));
+    std::memcpy(shared_page->wifi_macaddr, addr.data(), sizeof(MacAddress));
 }
 
 void Handler::SetWifiLinkLevel(WifiLinkLevel level) {
-    shared_page.wifi_link_level = static_cast<u8>(level);
+    shared_page->wifi_link_level = static_cast<u8>(level);
 }
 
 void Handler::Set3DLed(u8 state) {
-    shared_page.ledstate_3d = state;
+    shared_page->ledstate_3d = state;
+}
+
+void Handler::Set3DSlider(float slidestate) {
+    shared_page->sliderstate_3d = static_cast<float_le>(slidestate);
 }
 
 SharedPageDef& Handler::GetSharedPage() {
-    return shared_page;
+    return *shared_page;
 }
 
 } // namespace SharedPage
