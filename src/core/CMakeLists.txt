@@ -451,11 +451,9 @@ if (ARCHITECTURE_x86_64)
     target_link_libraries(core PRIVATE dynarmic)
 endif()
 
-<<<<<<< HEAD
 if (ENABLE_SCRIPTING)
     target_link_libraries(core PUBLIC libzmq-headers cppzmq-headers libzmq)
 endif()
-=======
 add_executable(libarmos_trampoline.so
     arm/armos/trampoline.cpp
 )
@@ -463,4 +461,3 @@ set_target_properties(libarmos_trampoline.so PROPERTIES COMPILE_FLAGS "-ffreesta
 set_target_properties(libarmos_trampoline.so PROPERTIES LINK_FLAGS "-nostartfiles")
 set_target_properties(libarmos_trampoline.so PROPERTIES LINKER_LANGUAGE C)
 add_dependencies(core libarmos_trampoline.so)
->>>>>>> ba93471c... Initial Armos test
